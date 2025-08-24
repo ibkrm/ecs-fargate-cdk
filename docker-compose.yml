@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  localstack:
+    container_name: "${LOCALSTACK_DOCKER_NAME:-localstack-mcp-gw}"
+    image: localstack/localstack:3.8
+    ports:
+      - "4566:4566"            # LocalStack Gateway
+      - "4510-4559:4510-4559"  # External services port range
+    environment:
+      # LocalStack configuration
+      - DEBUG=${DEBUG:-0}
+      - SERVICES=ecs,ec2,elbv2,route53,logs,iam,acm,codedeploy,application-autoscaling
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - HOST_TMP_FOLDER=${TMPDIR:-/tmp/}localstack
+      - PERSISTENCE=${PERSISTENCE:-0}
+      # AWS configuration
+      - AWS_DEFAULT_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      # ECS configuration
+      - ECS_REMOVE_CONTAINERS=1
+      - ECS_TASK_EXECUTOR=docker
+      # Networking
+      - LOCALSTACK_HOST=localhost:4566
+    volumes:
+      - "${LOCALSTACK_VOLUME_DIR:-./volume}:/var/lib/localstack"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # Sample application container for ECS testing
+  sample-app:
+    build: ./localstack/sample-app
+    ports:
+      - "8000:8000"
+    environment:
+      - NODE_ENV=development
+      - LOG_LEVEL=debug
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/ready/status"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # Simple LocalStack Dashboard
+  localstack-dashboard:
+    build:
+      context: ./localstack/dashboard
+      dockerfile: Dockerfile
+    ports:
+      - "8080:3000"
+    environment:
+      - LOCALSTACK_ENDPOINT=http://localstack:4566
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_DEFAULT_REGION=us-east-1
+    depends_on:
+      - localstack
+    profiles:
+      - ui

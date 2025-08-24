@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LocalStack Dashboard - MCP Gateway</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+        }
+        
+        .header {
+            background: #232f3e;
+            color: white;
+            padding: 1rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+        
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #00d084;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .card h2 {
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+            color: #232f3e;
+        }
+        
+        .service-item {
+            padding: 0.75rem;
+            border-left: 3px solid #ff9900;
+            background: #fafafa;
+            margin-bottom: 0.5rem;
+            border-radius: 0 4px 4px 0;
+        }
+        
+        .service-name {
+            font-weight: 600;
+            color: #232f3e;
+        }
+        
+        .service-detail {
+            font-size: 0.875rem;
+            color: #666;
+            margin-top: 0.25rem;
+        }
+        
+        .loading {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+        }
+        
+        .empty {
+            text-align: center;
+            color: #999;
+            font-style: italic;
+        }
+        
+        .refresh-btn {
+            background: #232f3e;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.875rem;
+        }
+        
+        .refresh-btn:hover {
+            background: #1a252f;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚀 LocalStack Dashboard</h1>
+        <div class="status">
+            <span class="status-dot"></span>
+            <span>Connected</span>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2>AWS Resources Overview</h2>
+            <button class="refresh-btn" onclick="refreshAll()">🔄 Refresh All</button>
+        </div>
+        
+        <div class="grid">
+            <div class="card">
+                <h2>🏗️ ECS Clusters</h2>
+                <div id="ecs-clusters" class="loading">Loading...</div>
+            </div>
+            
+            <div class="card">
+                <h2>📦 ECS Services</h2>
+                <div id="ecs-services" class="loading">Loading...</div>
+            </div>
+            
+            <div class="card">
+                <h2>🌐 VPCs</h2>
+                <div id="vpcs" class="loading">Loading...</div>
+            </div>
+            
+            <div class="card">
+                <h2>⚖️ Load Balancers</h2>
+                <div id="loadbalancers" class="loading">Loading...</div>
+            </div>
+            
+            <div class="card">
+                <h2>🌍 Route53 Zones</h2>
+                <div id="route53-zones" class="loading">Loading...</div>
+            </div>
+            
+            <div class="card">
+                <h2>🔐 IAM Roles</h2>
+                <div id="iam-roles" class="loading">Loading...</div>
+            </div>
+            
+            <div class="card">
+                <h2>📋 Log Groups</h2>
+                <div id="log-groups" class="loading">Loading...</div>
+            </div>
+            
+            <div class="card">
+                <h2>ℹ️ System Status</h2>
+                <div id="system-status" class="loading">Loading...</div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        async function fetchData(endpoint) {
+            try {
+                const response = await fetch(`/api/${endpoint}`);
+                return await response.json();
+            } catch (error) {
+                console.error(`Error fetching ${endpoint}:`, error);
+                return [];
+            }
+        }
+        
+        function renderItems(containerId, items, renderFn) {
+            const container = document.getElementById(containerId);
+            if (!items || items.length === 0) {
+                container.innerHTML = '<div class="empty">No items found</div>';
+                return;
+            }
+            
+            container.innerHTML = items.map(renderFn).join('');
+        }
+        
+        async function loadEcsClusters() {
+            const clusters = await fetchData('ecs/clusters');
+            renderItems('ecs-clusters', clusters, cluster => `
+                <div class="service-item">
+                    <div class="service-name">${cluster.clusterName || 'Unknown'}</div>
+                    <div class="service-detail">
+                        Tasks: ${cluster.runningTasksCount || 0} running, 
+                        ${cluster.pendingTasksCount || 0} pending
+                    </div>
+                </div>
+            `);
+        }
+        
+        async function loadEcsServices() {
+            const services = await fetchData('ecs/services');
+            renderItems('ecs-services', services, service => `
+                <div class="service-item">
+                    <div class="service-name">${service.serviceName || 'Unknown'}</div>
+                    <div class="service-detail">
+                        Desired: ${service.desiredCount || 0}, 
+                        Running: ${service.runningCount || 0}
+                    </div>
+                </div>
+            `);
+        }
+        
+        async function loadVpcs() {
+            const vpcs = await fetchData('ec2/vpcs');
+            renderItems('vpcs', vpcs, vpc => `
+                <div class="service-item">
+                    <div class="service-name">${vpc.VpcId}</div>
+                    <div class="service-detail">
+                        CIDR: ${vpc.CidrBlock}, State: ${vpc.State}
+                    </div>
+                </div>
+            `);
+        }
+        
+        async function loadLoadBalancers() {
+            const lbs = await fetchData('elbv2/loadbalancers');
+            renderItems('loadbalancers', lbs, lb => `
+                <div class="service-item">
+                    <div class="service-name">${lb.LoadBalancerName}</div>
+                    <div class="service-detail">
+                        Type: ${lb.Type}, State: ${lb.State?.Code}
+                    </div>
+                </div>
+            `);
+        }
+        
+        async function loadRoute53Zones() {
+            const zones = await fetchData('route53/zones');
+            renderItems('route53-zones', zones, zone => `
+                <div class="service-item">
+                    <div class="service-name">${zone.Name}</div>
+                    <div class="service-detail">
+                        Records: ${zone.ResourceRecordSetCount}
+                    </div>
+                </div>
+            `);
+        }
+        
+        async function loadIamRoles() {
+            const roles = await fetchData('iam/roles');
+            renderItems('iam-roles', roles, role => `
+                <div class="service-item">
+                    <div class="service-name">${role.RoleName}</div>
+                    <div class="service-detail">
+                        Created: ${new Date(role.CreateDate).toLocaleDateString()}
+                    </div>
+                </div>
+            `);
+        }
+        
+        async function loadLogGroups() {
+            const groups = await fetchData('logs/groups');
+            renderItems('log-groups', groups, group => `
+                <div class="service-item">
+                    <div class="service-name">${group.logGroupName}</div>
+                    <div class="service-detail">
+                        Retention: ${group.retentionInDays || 'Never expires'} days
+                    </div>
+                </div>
+            `);
+        }
+        
+        async function loadSystemStatus() {
+            const status = await fetchData('status');
+            document.getElementById('system-status').innerHTML = `
+                <div class="service-item">
+                    <div class="service-name">LocalStack Connection</div>
+                    <div class="service-detail">
+                        Endpoint: ${status.localstack_endpoint}<br>
+                        Region: ${status.region}<br>
+                        Updated: ${new Date(status.timestamp).toLocaleString()}
+                    </div>
+                </div>
+            `;
+        }
+        
+        async function refreshAll() {
+            await Promise.all([
+                loadEcsClusters(),
+                loadEcsServices(),
+                loadVpcs(),
+                loadLoadBalancers(),
+                loadRoute53Zones(),
+                loadIamRoles(),
+                loadLogGroups(),
+                loadSystemStatus()
+            ]);
+        }
+        
+        // Initial load
+        refreshAll();
+        
+        // Auto-refresh every 30 seconds
+        setInterval(refreshAll, 30000);
+    </script>
+</body>
+</html>
