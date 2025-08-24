@@ -32,6 +32,15 @@ Configuration is centralized in `lib/config/environment-config.ts` with region-s
 - `npm run format` - Format code with Prettier
 - `npm run format:check` - Check if code is formatted correctly
 
+### LocalStack Commands
+
+- `npm run localstack:start` - Start LocalStack for local development
+- `npm run localstack:start-ui` - Start LocalStack with GUI interfaces
+- `npm run localstack:stop` - Stop LocalStack services
+- `npm run localstack:deploy` - Deploy stack to LocalStack
+- `npm run localstack:destroy` - Remove stack from LocalStack
+- `npm run localstack:status` - Check LocalStack status
+
 ### Deployment Commands
 
 Deploy to specific environment (replace `<env>` with dev/qa/prod):
@@ -57,6 +66,10 @@ Deploy to specific environment (replace `<env>` with dev/qa/prod):
 - `npx cdk deploy --all -c environment=dev -c stackType=cfn` - Deploy dev CFN stacks
 - `npx cdk deploy --all -c environment=qa -c stackType=cfn` - Deploy qa CFN stacks
 - `npx cdk deploy --all -c environment=prod -c stackType=cfn` - Deploy prod CFN stacks
+
+**LocalStack (Local Development):**
+- `npm run localstack:deploy` - Deploy to LocalStack
+- `cdklocal deploy --all -c environment=local` - Direct CDK Local deployment
 
 ## Architecture
 
@@ -110,6 +123,94 @@ Resources are named with pattern: `{appName}-{environment}-{resource-type}-{regi
 - **CDK Stacks**: `mcp-gw-dev-us-east-1`, `mcp-gw-prod-us-west-2`
 
 The `appName` is configurable in the environment configuration and defaults to "mcp-gw".
+
+## LocalStack Development
+
+LocalStack provides a fully functional local AWS cloud stack for development and testing.
+
+### Prerequisites
+
+- **Docker** and **Docker Compose**
+- **Node.js** 18+ for sample application
+- **jq** for JSON processing (optional but recommended)
+
+### Quick Start
+
+1. **Start LocalStack**:
+   ```bash
+   npm run localstack:start
+   ```
+
+2. **Deploy to LocalStack**:
+   ```bash
+   npm run localstack:deploy
+   ```
+
+3. **Check deployment status**:
+   ```bash
+   npm run localstack:status
+   ```
+
+4. **Clean up**:
+   ```bash
+   npm run localstack:destroy
+   npm run localstack:stop
+   ```
+
+### LocalStack Configuration
+
+- **Environment**: `local` environment with minimal resource requirements
+- **Services**: ECS, EC2, ELBv2, Route53, CloudWatch Logs, IAM, ACM, CodeDeploy
+- **Sample App**: Node.js Express application with health checks
+- **Mock Resources**: Pre-configured VPC, subnets, security groups, certificates
+
+### Manual LocalStack Management
+
+```bash
+# Start LocalStack services
+./scripts/localstack.sh start
+
+# Initialize AWS resources (VPC, IAM roles, certificates)
+./scripts/localstack.sh init
+
+# Build sample application Docker image
+./scripts/localstack.sh build
+
+# Deploy CDK stack
+./scripts/localstack.sh deploy
+
+# View logs
+./scripts/localstack.sh logs
+
+# Clean up
+./scripts/localstack.sh destroy
+./scripts/localstack.sh stop
+```
+
+### LocalStack URLs
+
+- **LocalStack Gateway**: http://localhost:4566
+- **Sample Application**: http://localhost:8000 (when running standalone)
+- **Health Check**: http://localhost:8000/ready/status
+
+### LocalStack GUI Options
+
+**Built-in Web UI** (Free):
+- **URL**: http://localhost:4566/_localstack/cockpit
+- **Features**: Resource browser, service status, basic management
+
+**Custom LocalStack Dashboard**:
+- **URL**: http://localhost:8080 (when started with GUI)
+- **Features**: Real-time resource monitoring, ECS/EC2/Route53 browser
+- **Start**: `npm run localstack:start-ui`
+
+### Limitations
+
+LocalStack has some limitations compared to real AWS:
+- ECS tasks run as Docker containers on your local machine
+- Some advanced features may not be fully supported
+- Performance characteristics differ from AWS
+- Blue/green deployments are simulated
 
 ## Configuration Requirements
 

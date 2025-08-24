@@ -25,6 +25,37 @@ export interface EnvironmentConfig {
 }
 
 export const environments: { [key: string]: EnvironmentConfig } = {
+  local: {
+    appName: 'mcp-gw',
+    environment: 'local',
+    regions: {
+      'us-east-1': {
+        region: 'us-east-1',
+        vpcId: 'vpc-12345678', // LocalStack default VPC
+        subnetIds: ['subnet-12345678', 'subnet-87654321'], // LocalStack default subnets
+        securityGroupIds: ['sg-ae374e9b657d70aa0'], // LocalStack created security group
+        certificateArn: 'arn:aws:acm:us-east-1:000000000000:certificate/d332aa69-965b-4973-b83d-67fec57413a7', // LocalStack created certificate
+        hostedZoneId: '0SQTVEPGW0AFBRL', // LocalStack created hosted zone
+      },
+    },
+    iamRoleArn: 'arn:aws:iam::000000000000:role/ecs-task-role', // LocalStack created IAM role
+    domainName: 'local.mcp-gw.com',
+    containerImage: 'mcp-gw-sample-app:latest', // Local Docker image
+    containerPort: 8000,
+    healthCheckPath: '/ready/status',
+    minCapacity: 1,
+    maxCapacity: 2,
+    desiredCount: 1,
+    cpu: 256,
+    memory: 512,
+    containerEnvironmentVariables: {
+      NODE_ENV: 'development',
+      LOG_LEVEL: 'debug',
+      API_VERSION: 'v1',
+      DATABASE_POOL_SIZE: '2',
+      CACHE_TTL: '60',
+    },
+  },
   dev: {
     appName: 'mcp-gw',
     environment: 'dev',
