@@ -168,75 +168,21 @@ export class SimpleEcsServiceStack extends cdk.Stack {
       defaultAction: elbv2.ListenerAction.forward([targetGroup8000]), // Default to port 8000
     });
 
-    // Path stripping using ALB redirects
-    // This approach uses two HTTP calls but strips paths at ALB level
+    // Host-based routing using subdomains
+    // *.cloud.example.com -> port 8000 (default)
+    // *.admin.cloud.example.com -> port 8001
+    // *.ui.cloud.example.com -> port 8002
 
-    // Redirect /api/* to /api-internal/* (stripped path)
-    httpsListener.addAction('ApiRedirectAction', {
-      priority: 50,
-      conditions: [elbv2.ListenerCondition.pathPatterns(['/api/*'])],
-      action: elbv2.ListenerAction.redirect({
-        protocol: 'HTTPS',
-        port: '443',
-        host: '#{host}',
-        path: '/api-internal#{path[4:]}', // Strip '/api' and add '/api-internal'
-        query: '#{query}',
-        statusCode: elbv2.RedirectResponseStatusCode.HTTP_302_FOUND, // Use 302 for temporary redirect
-      }),
-    });
-
-    // Redirect /ui/* to /ui-internal/* (stripped path)
-    httpsListener.addAction('UiRedirectAction', {
-      priority: 60,
-      conditions: [elbv2.ListenerCondition.pathPatterns(['/ui/*'])],
-      action: elbv2.ListenerAction.redirect({
-        protocol: 'HTTPS',
-        port: '443',
-        host: '#{host}',
-        path: '/ui-internal#{path[3:]}', // Strip '/ui' and add '/ui-internal'
-        query: '#{query}',
-        statusCode: elbv2.RedirectResponseStatusCode.HTTP_302_FOUND,
-      }),
-    });
-
-    // Forward the redirected requests to appropriate target groups
-    httpsListener.addAction('Service8001Action', {
+    httpsListener.addAction('AdminHostAction', {
       priority: 100,
-      conditions: [elbv2.ListenerCondition.pathPatterns(['/api-internal', '/api-internal/*'])],
+      conditions: [elbv2.ListenerCondition.hostHeaders(['*.admin.cloud.example.com'])],
       action: elbv2.ListenerAction.forward([targetGroup8001]),
     });
 
-    httpsListener.addAction('Service8002Action', {
+    httpsListener.addAction('UiHostAction', {
       priority: 200,
-      conditions: [elbv2.ListenerCondition.pathPatterns(['/ui-internal', '/ui-internal/*'])],
+      conditions: [elbv2.ListenerCondition.hostHeaders(['*.ui.cloud.example.com'])],
       action: elbv2.ListenerAction.forward([targetGroup8002]),
-    });
-
-    // Handle exact /api and /ui paths (without trailing slash)
-    httpsListener.addAction('ApiExactRedirectAction', {
-      priority: 40,
-      conditions: [elbv2.ListenerCondition.pathPatterns(['/api'])],
-      action: elbv2.ListenerAction.redirect({
-        protocol: 'HTTPS',
-        port: '443',
-        host: '#{host}',
-        path: '/api-internal/',
-        query: '#{query}',
-        statusCode: elbv2.RedirectResponseStatusCode.HTTP_302_FOUND,
-      }),
-    });
-
-    httpsListener.addAction('UiExactRedirectAction', {
-      priority: 45,
-      conditions: [elbv2.ListenerCondition.pathPatterns(['/ui'])],
-      action: elbv2.ListenerAction.redirect({
-        protocol: 'HTTPS',
-        port: '443',
-        host: '#{host}',
-        path: '/ui-internal/',
-        query: '#{query}',
-        statusCode: elbv2.RedirectResponseStatusCode.HTTP_302_FOUND,
-      }),
     });
 
     // Create HTTP Listener (redirect to HTTPS)
@@ -250,12 +196,12 @@ export class SimpleEcsServiceStack extends cdk.Stack {
       }),
     });
 
-    // Create ECS Service (using default ECS deployment controller)
+    // Create ECS Service with fixed task count (no auto-scaling)
     const service = new ecs.FargateService(this, 'EcsService', {
       cluster: cluster,
       taskDefinition: taskDefinition,
       serviceName: `${environmentConfig.appName}-${environmentConfig.environment}-simple-service-${regionConfig.region}`,
-      desiredCount: environmentConfig.desiredCount,
+      desiredCount: 1, // Fixed to 1 task
       vpcSubnets: {
         subnets: subnets,
       },
@@ -273,23 +219,7 @@ export class SimpleEcsServiceStack extends cdk.Stack {
     service.attachToApplicationTargetGroup(targetGroup8001);
     service.attachToApplicationTargetGroup(targetGroup8002);
 
-    // Create Auto Scaling
-    const scalableTarget = service.autoScaleTaskCount({
-      minCapacity: environmentConfig.minCapacity,
-      maxCapacity: environmentConfig.maxCapacity,
-    });
-
-    scalableTarget.scaleOnCpuUtilization('CpuScaling', {
-      targetUtilizationPercent: 70,
-      scaleInCooldown: cdk.Duration.seconds(300),
-      scaleOutCooldown: cdk.Duration.seconds(300),
-    });
-
-    scalableTarget.scaleOnMemoryUtilization('MemoryScaling', {
-      targetUtilizationPercent: 80,
-      scaleInCooldown: cdk.Duration.seconds(300),
-      scaleOutCooldown: cdk.Duration.seconds(300),
-    });
+    // Auto-scaling removed - running with fixed task count of 1
 
     // Create Route53 Record
     const hostedZone = route53.HostedZone.fromHostedZoneId(
@@ -323,17 +253,17 @@ export class SimpleEcsServiceStack extends cdk.Stack {
 
     new cdk.CfnOutput(this, 'TargetGroup8000Arn', {
       value: targetGroup8000.targetGroupArn,
-      description: 'Target Group ARN for port 8000 (default)',
+      description: 'Target Group ARN for port 8000 (*.cloud.example.com)',
     });
 
     new cdk.CfnOutput(this, 'TargetGroup8001Arn', {
       value: targetGroup8001.targetGroupArn,
-      description: 'Target Group ARN for port 8001 (/service1/*)',
+      description: 'Target Group ARN for port 8001 (*.admin.cloud.example.com)',
     });
 
     new cdk.CfnOutput(this, 'TargetGroup8002Arn', {
       value: targetGroup8002.targetGroupArn,
-      description: 'Target Group ARN for port 8002 (/service2/*)',
+      description: 'Target Group ARN for port 8002 (*.ui.cloud.example.com)',
     });
   }
 }
